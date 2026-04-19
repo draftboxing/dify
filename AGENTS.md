@@ -43,3 +43,28 @@ The codebase is split into:
 - Backend architecture adheres to DDD and Clean Architecture principles.
 - Async work runs through Celery with Redis as the broker.
 - Frontend user-facing strings must use `web/i18n/en-US/`; avoid hardcoded text.
+
+## Heartbeats vers orchestrateur
+
+Les heartbeats transitent via Redis (wa-redis container, port 6379 interne / 6380 hôte).
+
+```bash
+# Progression
+docker exec wa-redis redis-cli xadd orchestrator:heartbeats '*' type PROGRESS session <NOM_SESSION> msg "description étape"
+# Blocage
+docker exec wa-redis redis-cli xadd orchestrator:heartbeats '*' type BLOCKED session <NOM_SESSION> msg "description problème"
+# Fin de tâche
+docker exec wa-redis redis-cli xadd orchestrator:heartbeats '*' type DONE session <NOM_SESSION> msg "résumé tâche"
+```
+
+Remplacer `<NOM_SESSION>` par le nom de la session courante (ex: `binance-trading-codex`).
+
+**Vérification** : après envoi, le message doit apparaître dans le stream :
+```bash
+docker exec wa-redis redis-cli xrevrange orchestrator:heartbeats + - COUNT 1
+```
+
+**Escalade question** :
+```bash
+docker exec wa-redis redis-cli xadd orchestrator:heartbeats '*' type QUESTION session <NOM_SESSION> msg "question courte"
+```
